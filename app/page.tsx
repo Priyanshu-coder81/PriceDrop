@@ -1,14 +1,14 @@
 import AddProductForm from "@/components/AddProductForm";
 import AuthButton from "@/components/AuthButton";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/utils/supabase/client";
-import { Bell, Divide, Icon, LogIn, Rabbit, Shield } from "lucide-react";
+import { createClient } from "@/utils/supabase/server";
+import { Bell, Divide, Icon, LogIn, Rabbit, Shield, TrendingDown } from "lucide-react";
 
 import Image from "next/image";
 
 export default async function Home() {
 
-  const supabase =  createClient();
+  const supabase = await createClient();
 
   const {data : {user}} = await supabase.auth.getUser()
 
@@ -86,6 +86,21 @@ export default async function Home() {
         )}
         </div>
       </section>
+      
+      {/* Product List */}
+      {user && product.length == 0 && (
+        <section className="max-w-2xl mx-auto px-4 pb-20 text-center">
+          <div className="bg-white rounded-xl border-2 border-dashed border-gray-300 p-12">
+            <TrendingDown className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                No Produts yet
+              </h3>
+              <p className="text-gray-600">
+                Add your first produect to start tracking price drops!
+              </p>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
