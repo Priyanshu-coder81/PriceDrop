@@ -10,7 +10,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get("Authorization");
-        const cronSecret = process.env.CRON_SECRET;
+        const cronSecret = process.env.CRON_KEY;
 
         if(!cronSecret || authHeader !== `Bearer ${cronSecret}`){
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,16 +53,19 @@ export async function POST(request: Request) {
                 const newPrice = parseFloat((productData.currentPrice+""));
                 const oldPrice = parseFloat(product.current_price);
 
+                console.log(`Product: ${product.name}, Old Price: ${oldPrice}, New Price: ${newPrice}`);
+
+                // Update product price in database
                 await supabase.from("products")
                 .update({
                     current_price: newPrice,
-                    currency: productData.currencyCode || product.currency || product.currency,
-
-                    name : productData.productImageUrl || product.image_url,
+                    name : productData.productName,
+                    currency: productData.currencyCode || product.currency,
                     updated_at : new Date().toISOString(),
                 })
                 .eq("id", product.id);
 
+                // update price history in database
                 if(oldPrice !== newPrice){
                     await supabase.from("price_history").insert({
                         product_id: product.id,
@@ -71,17 +74,21 @@ export async function POST(request: Request) {
                     });
 
                     result.priceChanges++;
+                    console.log(`Price change detected for product ID ${product.id}: ${oldPrice} -> ${newPrice}`);
                 }
 
                 if(newPrice < oldPrice){
                     // Alert email
+                    console.log("Sending price drop email")
                     const { data : {user}} = await supabase.auth.admin.getUserById(product.user_id);
                 
 
                 if(user?.email){
                     // send alert email
-                    const result = await sendPriceDropAlert(user.email, product, oldPrice, newPrice);
-
+                    const emailResult = await sendPriceDropAlert(user.email, product, oldPrice, newPrice);
+                      if (emailResult?.success) {
+                        result.alertsSent++;
+                    }
                 }
             }
                 result.updated++;
@@ -100,3 +107,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+// curl.exe -X POST https://price-dropp.vercel.app/api/cron/check-price -H "Authorization: Bearer eb78f5c9630210425736d4e03eef434025c770b0d297b8ede4f2271565320976"
+// curl.exe -X POST http://localhost:3000/api/cron/check-price -H "Authorization: Bearer eb78f5c9630210425736d4e03eef434025c770b0d297b8ede4f2271565320976"
