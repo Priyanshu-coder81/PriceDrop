@@ -3,14 +3,44 @@ import { useState } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Loader2, Loader2Icon } from "lucide-react";
-import AuthButton from "./AuthButton";
+import { AuthModel } from "./AuthModel";
+import { addProduct } from "@/app/action";
+import { toast } from "sonner";
 
 const AddProductForm = ({user}:any)  => {
     const [url,setUrl] = useState("");
     const [loading, setLoading]  = useState(false);
+    const [showAuthModel, setShowAuthModel] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if(!user){
+            setShowAuthModel(true);
+            return;
+        }
+
+        setLoading(true);
+
+        const formData = new FormData();
+        formData.append("url", url);
+
+        const result = await addProduct(formData);
+
+        if(result.error){
+            toast.error(result.error);
+        }
+        else{
+            toast.success( result.message ||"Product added successfully");
+            setUrl("");
+        }
+
+        setLoading(false);
+
+    }
   return (
     <>
-    <form action="" className="w-full max-w-2xl mx-auto">
+    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
         <div className='flex flex-col sm:flex-row gap-2'>
             <Input
             type="url"
@@ -35,8 +65,13 @@ const AddProductForm = ({user}:any)  => {
         </div>
     </form>
 
-    {/*  */}
+    {/*  Auth Model */}
+     <AuthModel isOpen={showAuthModel}
+    onClose= {() => setShowAuthModel(false)}
+    ></AuthModel>
+
     
+   
     </>
   )
 }
