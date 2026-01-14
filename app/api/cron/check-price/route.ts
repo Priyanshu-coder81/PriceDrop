@@ -30,8 +30,8 @@ export async function POST(request: Request) {
 
         if(prodcutError) throw prodcutError;
 
-        console.log(`Checking prices for ${products.length} products`);
-
+/* 
+        Just for testing purposes
 
         const result = {
             total : products.length,
@@ -40,13 +40,13 @@ export async function POST(request: Request) {
             priceChanges: 0,
             alertsSent: 0,
         }
-
+ */
         for(const product of products){
             try {
                 const productData = await scrapeProduct(product.url);
 
                 if(!productData.currentPrice){
-                    result.failed++;
+                    //result.failed++;
                     continue;
                 }
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
                 console.log(`Product: ${product.name}, Old Price: ${oldPrice}, New Price: ${newPrice}`);
 
                 // Update product price in database
-                await supabase.from("products")
+                const { error: updateError } = await supabase.from("products")
                 .update({
                     current_price: newPrice,
                     name : productData.productName,
@@ -65,21 +65,30 @@ export async function POST(request: Request) {
                 })
                 .eq("id", product.id);
 
+                if (updateError) {
+                    console.error(`Failed to update product ID ${product.id}:`, updateError);
+                    throw updateError;
+                }
+
                 // update price history in database
-                if(oldPrice !== newPrice){
-                    await supabase.from("price_history").insert({
+                if (oldPrice !== newPrice) {
+                    const { error: historyError } = await supabase.from("price_history").insert({
                         product_id: product.id,
                         price: newPrice,
                         currency: productData.currencyCode || product.currency,
+                        checked_at: new Date().toISOString(),
                     });
 
-                    result.priceChanges++;
-                    console.log(`Price change detected for product ID ${product.id}: ${oldPrice} -> ${newPrice}`);
+                    if (historyError) {
+                        console.error(`Failed to insert price history for product ID ${product.id}:`, historyError);
+                        throw historyError; // or handle differently, but throwing will increment failed
+                    }
+
+                   // result.priceChanges++;
                 }
 
                 if(newPrice < oldPrice){
                     // Alert email
-                    console.log("Sending price drop email")
                     const { data : {user}} = await supabase.auth.admin.getUserById(product.user_id);
                 
 
@@ -87,26 +96,23 @@ export async function POST(request: Request) {
                     // send alert email
                     const emailResult = await sendPriceDropAlert(user.email, product, oldPrice, newPrice);
                       if (emailResult?.success) {
-                        result.alertsSent++;
+                       // result.alertsSent++;
                     }
                 }
             }
-                result.updated++;
+                //result.updated++;
 
                 
             } catch (error) {
                 console.error(`Failed to update product ID ${product.id}`, error);
-                result.failed++;
+              //  result.failed++;
             }
         }
 
-        return NextResponse.json({ message: "Price check completed", result });
+        return NextResponse.json({ message: "Price check completed" }, { status: 200 });
         
     } catch (error) {
         console.error("Cron Job Error", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
-
-// curl.exe -X POST https://price-dropp.vercel.app/api/cron/check-price -H "Authorization: Bearer eb78f5c9630210425736d4e03eef434025c770b0d297b8ede4f2271565320976"
-// curl.exe -X POST http://localhost:3000/api/cron/check-price -H "Authorization: Bearer eb78f5c9630210425736d4e03eef434025c770b0d297b8ede4f2271565320976"
