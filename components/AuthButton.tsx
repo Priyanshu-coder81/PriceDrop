@@ -11,7 +11,7 @@ const AuthButton = ({user}:any ) => {
     if(user){
         return (
             <form action={signOut}>
-                <Button variant="ghost" size={"sm"} type="submit" className=" gap-2">
+                <Button variant="outline" size={"sm"} type="submit" className=" gap-2 border-primary hover:bg-primary/50">
                     <LogOut /> 
                     Sign Out
                 </Button>
